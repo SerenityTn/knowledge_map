@@ -20,36 +20,74 @@ class Calendar extends Component {
 	constructor(){
 		super();
 		this.state = {
-			events: this.getEvents()
-		}						
-		Calendar.trello.makeRequest('get', '/1/members/me/boards', { webhooks: true })
-		.then((res) => {
-			console.log(res)
+			events:[]
+		}		
+
+		this.setTrelloCards();						
+	}
+
+	setTrelloCards(){		
+		this.getBoardsIds()
+		.then((boards_ids)=>{
+			console.log(1);
+			let eventsFromCards = [];
+			let promises = [];
+			boards_ids.forEach((board_id) =>{
+				promises.push(this.getCardsByBoard(board_id));
+			});			
+			Promise.all(promises).then((cardsLists) => {				
+				cardsLists.forEach((cards)=>{
+					cards.forEach((card) =>{
+						if(card.due){						
+							eventsFromCards.push(this.convertCardToEvent(card));					
+						}
+					})			
+				});				
+				this.addEventsToCalendar(eventsFromCards);			
+			});
+		})		
+	}
+
+	addEventsToCalendar(eventsFromCards){
+		const events = this.state.events;				
+		this.setState({
+			events: events.concat(eventsFromCards),
+		});		
+	}
+
+	convertCardToEvent(card){
+		return {
+			'title': card.name,
+			'start': new Date(card.due),
+			'end': new Date(card.due)
+		}
+	}
+
+	getCardsByBoard(boardId){
+		return Calendar.trello.makeRequest('get', '/1/boards/'+boardId+'/cards')
+		.then((cards) => {
+			return cards;
 		});
 	}
 
-	getEvents(){
-		return [  
-		{
-			'title': 'Serenity Event',
-			'start': new Date(2017, 3, 30),
-			'end': new Date(2017, 3, 30)
-		},
-
-		{
-			'title': 'DTS STARTS',
-			'start': new Date(2017, 3, 31, 12, 0, 0),
-			'end': new Date(2017, 3, 31, 13, 0, 0)
-		}
-		]
+	getBoardsIds(){
+		let boards_ids = [];
+		return Calendar.trello.makeRequest('get', '/1/members/me/boards', { webhooks: true })
+		.then((boards) => {
+			boards.forEach(function(board){				
+				boards_ids.push(board.id);
+			});			
+		})
+		.then(() => {			
+			return boards_ids;
+		});
 	}	
 
 	render(){		
 		return (
-			<BigCalendar
-			{...this.props}
-			events = { this.getEvents()}
-			defaultDate={new Date(2017, 3, 30)}
+			<BigCalendar			
+			events={ this.state.events}
+			defaultDate={new Date(Date.now())}
 			/>
 			)
 	}
