@@ -1,11 +1,20 @@
 import React, { Component } from 'react';
 import BigCalendar from 'react-big-calendar';
+import HTML5Backend from 'react-dnd-html5-backend'
+import { DragDropContext } from 'react-dnd'
+import withDragAndDrop from 'react-big-calendar/lib/addons/dragAndDrop';
+import 'react-big-calendar/lib/addons/dragAndDrop/styles.less';
+
 import moment from 'moment';
+import momentTz from 'moment-timezone';
 import Trello from 'trello';
 
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 
 BigCalendar.momentLocalizer(moment);
+
+const DragAndDropCalendar = withDragAndDrop(BigCalendar);
+
 
 class Calendar extends Component {
 	static get APPKEY (){
@@ -17,19 +26,41 @@ class Calendar extends Component {
 
 	static trello = new Trello(Calendar.APPKEY, Calendar.TOKEN);
 	
-	constructor(){
-		super();
+	constructor(props){
+		super(props);
 		this.state = {
 			events:[]
-		}		
-
-		this.setTrelloCards();						
+		}				
+		this.moveEvent = this.moveEvent.bind(this)				
 	}
 
-	setTrelloCards(){		
+	componentDidMount() {	
+		this.setTrelloCards();
+	}
+
+	moveEvent({ event, start, end }) {
+		const { events } = this.state;		
+		const idx = events.indexOf(event);
+		const updatedEvent = { ...event, start, end };		
+		const nextEvents = [...events]
+		nextEvents.splice(idx, 1, updatedEvent);
+		this.updateEventDue(event.id, end)
+		.then((res) => {
+			console.log(res);
+			this.setState({
+				events: nextEvents
+			});
+		})	;	
+		//alert(`${event.title} was dropped onto ${event.start}`);
+	}
+
+	updateEventDue(cardId, endDate){
+		return Calendar.trello.makeRequest('put', '/1/cards/' + cardId, { 'due' : endDate});
+	}
+
+	setTrelloCards(){
 		this.getBoardsIds()
-		.then((boards_ids)=>{
-			console.log(1);
+		.then((boards_ids)=>{			
 			let eventsFromCards = [];
 			let promises = [];
 			boards_ids.forEach((board_id) =>{
@@ -55,8 +86,9 @@ class Calendar extends Component {
 		});		
 	}
 
-	convertCardToEvent(card){
+	convertCardToEvent(card){		
 		return {
+			'id' : card.id,
 			'title': card.name,
 			'start': new Date(card.due),
 			'end': new Date(card.due)
@@ -82,12 +114,14 @@ class Calendar extends Component {
 			return boards_ids;
 		});
 	}	
-
-	render(){		
+	render(){
 		return (
-			<BigCalendar			
-			events={ this.state.events}
-			defaultDate={new Date(Date.now())}
+			<DragAndDropCalendar
+			selectable
+			events={this.state.events}
+			onEventDrop={this.moveEvent}
+			defaultView='week'
+			defaultDate={new Date()}
 			/>
 			)
 	}
