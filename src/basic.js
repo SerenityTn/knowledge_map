@@ -114,6 +114,16 @@ class Calendar extends Component {
 			return boards_ids;
 		});
 	}	
+	eventStyleGetter (event, start, end, isSelected) {
+		console.log(event);		
+		var style = {			
+			fontSize:'14px',						
+		};
+		return {
+			style: style
+		};
+	}
+
 	render(){
 		return (
 			<DragAndDropCalendar
@@ -122,6 +132,7 @@ class Calendar extends Component {
 			onEventDrop={this.moveEvent}
 			defaultView='week'
 			defaultDate={new Date()}
+			eventPropGetter={(this.eventStyleGetter)}
 			/>
 			)
 	}
